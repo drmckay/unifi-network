@@ -1,0 +1,42 @@
+services:
+  unifi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: unifi-network
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+      - unifi_vlan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_proxy"
+
+      # Web UI (HTTPS) - pass through UniFi's own TLS cert on 8443
+      - "traefik.tcp.routers.unifi-ui.rule=HostSNI(`unifi.home`)"
+      - "traefik.tcp.routers.unifi-ui.entrypoints=websecure"
+      - "traefik.tcp.routers.unifi-ui.tls=true"
+      - "traefik.tcp.routers.unifi-ui.tls.passthrough=true"
+      - "traefik.tcp.routers.unifi-ui.service=unifi-ui-svc"
+      - "traefik.tcp.services.unifi-ui-svc.loadbalancer.server.port=8443"
+
+      # Inform URL (HTTP) - route /inform to UniFi on 8080
+      - "traefik.http.routers.unifi-inform.rule=Host(`unifi.home`) && PathPrefix(`/inform`)"
+      - "traefik.http.routers.unifi-inform.entrypoints=web"
+      - "traefik.http.routers.unifi-inform.service=unifi-inform-svc"
+      - "traefik.http.services.unifi-inform-svc.loadbalancer.server.port=8080"
+    volumes:
+      - unifi_data:/var/lib/unifi
+      - unifi_logs:/usr/lib/unifi/logs
+      - unifi_config:/etc/unifi
+
+volumes:
+  unifi_data:
+  unifi_logs:
+  unifi_config:
+
+networks:
+  traefik_proxy:
+    external: true
+  unifi_vlan:
+    external: true
